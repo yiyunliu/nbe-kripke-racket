@@ -31,6 +31,11 @@
   (tm-abs (tm-abs
            (tm-app b (tm-var 1) (tm-app a (tm-var 1) (tm-var 0))))))
 
+(define (tm-compose a b)
+  (tm-abs (tm-app a (tm-app b (tm-var 0)))))
+
+(define (tm-mult a b) (tm-compose a b))
+
 (define (tm-nat n)
   (if (positive? n)
       (tm-suc (tm-nat (- n 1)))
@@ -40,4 +45,9 @@
 (check-equal? (normalize `(app (app (app ,tm-pair ,tm-id) ,tm-fst) ,tm-snd)) tm-fst)
 (check-equal? (normalize `(app (app (app ,tm-pair ,tm-id) ,tm-fst) ,tm-fst)) tm-id)
 (check-equal? (normalize (tm-app tm-snd (tm-app tm-pair tm-id tm-fst) tm-fst)) tm-fst)
-(check-equal? (normalize (tm-add (tm-nat 100) (tm-nat 40))) (normalize (tm-add (tm-nat 40) (tm-nat 100))))
+(check-equal? (normalize (tm-add (tm-nat 499) (tm-nat 777))) (normalize (tm-add (tm-nat 777) (tm-nat 499))))
+(check-equal? (normalize (tm-mult (tm-nat 3) (tm-nat 2))) (normalize (tm-nat 6)))
+(check-equal? (normalize (tm-mult (tm-nat 11) (tm-nat 116))) (normalize (tm-nat 1276)))
+(check η-eq? (normalize (tm-add (tm-nat 499) (tm-nat 777))) (normalize (tm-add (tm-nat 777) (tm-nat 499))))
+(check βη-eq? (tm-mult (tm-nat 888) (tm-nat 999)) (tm-nat 887112))
+(check β-eq? (tm-mult (tm-nat 888) (tm-nat 999)) (tm-nat 887112))
