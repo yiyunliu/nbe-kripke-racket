@@ -43,7 +43,7 @@
 
 (define (reify-neu a)
   (match a
-    [`(app ,u ,v) (list 'app (reify-neu u) (reify a))]
+    [`(app ,u ,v) (list 'app (reify-neu u) (reify v))]
     [`(var ,i) a]))
 
 (define (idsub i) `(neu (var ,i)))
@@ -51,4 +51,11 @@
 (define (normalize a)
   (reify (interp a idsub)))
 
-(provide normalize)
+(define (tm? a)
+  (match a
+    [`(λ ,a) (tm? a)]
+    [`(app ,a ,b) (and (tm? a) (tm? b))]
+    [`(var ,i) (exact-nonnegative-integer? i)]
+    [_ false]))
+
+(provide reify interp normalize tm?)
