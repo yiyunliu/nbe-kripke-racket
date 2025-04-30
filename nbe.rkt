@@ -17,19 +17,20 @@
     [_ false]))
 
 (define-syntax-rule (ap a b)
-  (match a
-    [`(fun ,f) (f identity b)]
+  (match (force a)
+    [`(fun ,f) (force (f identity b))]
     [`(neu ,u) `(neu (app ,u ,b))]
     [_ (error "ap: type error")]))
 
 (define-syntax-rule (ifz a b c)
-  (match a
-    ['zero b]
+  (match (force a)
+    ['zero (force b)]
     [`(succ ,u) (ap c u)]
     [`(neu ,u) `(neu (if-zero ,u ,b ,c))]))
 
 (define compose-ren compose)
-(define (compose-ren-sub ξ ρ) (compose (curry ren-dom ξ) ρ))
+(define (compose-ren-sub ξ ρ)
+  (compose (curry ren-dom ξ) ρ))
 (define-syntax-rule (ext ρ a)
   (lambda (i)
     (if (zero? i)
@@ -43,26 +44,26 @@
     [`(if-zero ,a ,b ,c) `(if-zero ,(ren-ne-dom ξ a) ,(ren-dom ξ b) ,(ren-dom ξ c))]))
 
 (define (ren-dom ξ a)
-  (match a
+  (delay (match (force a)
     ['zero 'zero]
     [`(succ ,a) `(succ ,(ren-dom ξ a))]
     [`(neu ,a) `(neu ,(ren-ne-dom ξ a))]
-    [`(fun ,f) `(fun ,(λ (ξ0 α) (f (compose-ren ξ0 ξ) α)))]))
+    [`(fun ,f) `(fun ,(λ (ξ0 α) (f (compose-ren ξ0 ξ) α)))])))
 
 (define-syntax-rule (interp-fun a ρ)
   (list 'fun (λ (ξ x) (interp a (ext (compose-ren-sub ξ ρ) x)))))
 
 (define (interp a ρ)
-  (match a
-    [`(var ,i) (ρ i)]
+  (delay (match a
+    [`(var ,i) (force (ρ i))]
     ['zero 'zero]
     [`(succ ,a) `(succ ,(interp a ρ))]
     [`(if-zero ,a ,b ,c) (ifz (interp a ρ) (interp b ρ) (interp-fun c ρ))]
     [`(λ ,a) (interp-fun a ρ)]
-    [`(app ,a ,b) (ap (interp a ρ) (interp b ρ))]))
+    [`(app ,a ,b) (ap (interp a ρ) (interp b ρ))])))
 
 (define (reify a)
-  (match a
+  (match (force a)
     ['zero 'zero]
     [`(succ ,a) `(succ ,(reify a))]
     [`(fun ,f) (list 'λ (reify (f  (curry + 1) '(neu (var 0)))))]

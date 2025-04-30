@@ -70,3 +70,5 @@
 (check η-eq? (normalize (tm-add (tm-nat 499) (tm-nat 777))) (normalize (tm-add (tm-nat 777) (tm-nat 499))))
 (check βη-eq? (tm-mult (tm-nat 6) (tm-nat 7)) (tm-nat 42))
 (check βη-eq? '(if-zero (succ (succ zero)) zero (succ (succ (var 0)))) (tm-pnat 3))
+(check βη-eq? (tm-padd (tm-pnat 8) (tm-pnat 11)) (tm-pnat 19))
+(check βη-eq? (tm-padd (tm-pnat 2) (tm-psuc (tm-var 0))) '(succ (succ (succ (var 0)))))
