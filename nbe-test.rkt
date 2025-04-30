@@ -19,7 +19,7 @@
 
 (define tm-pair `(λ (λ (λ ,(tm-app '(var 0) '(var 2) '(var 1))))))
 
-(define tm-y
+(define tm-fix
   (let ([g (tm-abs (tm-app (tm-var 1) (tm-app (tm-var 0) (tm-var 0))))])
     (tm-abs (tm-app g g))))
 
@@ -41,6 +41,25 @@
       (tm-suc (tm-nat (- n 1)))
       tm-zero))
 
+(define (tm-pnat n)
+  (if (positive? n)
+      `(succ ,(tm-pnat (- n 1)))
+      'zero))
+
+(define (tm-ifz a b c)
+  `(if-zero ,a ,b ,c))
+
+(define (tm-psuc a)
+  `(succ ,a))
+
+(define (tm-double m)
+  (tm-app tm-fix
+          (tm-abs (tm-abs (tm-ifz (tm-var 0) 'zero 'zero))) m ))
+
+(define (tm-padd m n)
+  (tm-app tm-fix
+          (tm-abs (tm-abs (tm-abs (tm-ifz (tm-var 1) (tm-var 0) (tm-psuc (tm-app (tm-var 3) (tm-var 0) (tm-var 1))))))) m n))
+
 (check-equal? (normalize `(app ,tm-id ,tm-id)) tm-id)
 (check-equal? (normalize `(app (app (app ,tm-pair ,tm-id) ,tm-fst) ,tm-snd)) tm-fst)
 (check-equal? (normalize `(app (app (app ,tm-pair ,tm-id) ,tm-fst) ,tm-fst)) tm-id)
@@ -49,5 +68,5 @@
 (check-equal? (normalize (tm-mult (tm-nat 3) (tm-nat 2))) (normalize (tm-nat 6)))
 (check-equal? (normalize (tm-mult (tm-nat 11) (tm-nat 116))) (normalize (tm-nat 1276)))
 (check η-eq? (normalize (tm-add (tm-nat 499) (tm-nat 777))) (normalize (tm-add (tm-nat 777) (tm-nat 499))))
-(check βη-eq? (tm-mult (tm-nat 888) (tm-nat 999)) (tm-nat 887112))
-(check β-eq? (tm-mult (tm-nat 888) (tm-nat 999)) (tm-nat 887112))
+(check βη-eq? (tm-mult (tm-nat 6) (tm-nat 7)) (tm-nat 42))
+(check βη-eq? '(if-zero (succ (succ zero)) zero (succ (succ (var 0)))) (tm-pnat 3))
