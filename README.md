@@ -11,6 +11,5 @@ gives you β-normal forms. However, you can get a little bit of
 βη-equivalence by invoking Coquand's algorithm (`η-eq?`) on
 β-normal forms.
 
-I'm hoping to expand the repository into a benchmark suite where I can
-visualize the performance trade-off of type-directed NbE compared to
-untyped NbE composed with Coquand's algorithm.
+A more efficient version of NbE based on de Bruijn levels (inverted de
+bruijn indices) can be found in the `debruijn-levels` branch.
