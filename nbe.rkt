@@ -18,7 +18,7 @@
 
 (define-syntax-rule (ap a b)
   (match (force a)
-    [`(fun ,f) (force (f identity b))]
+    [`(fun ,f) (force (f b))]
     [`(neu ,u) `(neu (app ,u ,b))]
     [_ (error "ap: type error")]))
 
@@ -28,30 +28,14 @@
     [`(succ ,u) (ap c u)]
     [`(neu ,u) `(neu (if-zero ,u ,b ,c))]))
 
-(define compose-ren compose)
-(define (compose-ren-sub ξ ρ)
-  (compose (curry ren-dom ξ) ρ))
 (define-syntax-rule (ext ρ a)
   (lambda (i)
     (if (zero? i)
         a
         (ρ (- i 1)))))
 
-(define (ren-ne-dom ξ a)
-  (match a
-    [`(var ,i) `(var ,(ξ i))]
-    [`(app ,a ,b) `(app ,(ren-ne-dom ξ a) ,(ren-dom ξ b))]
-    [`(if-zero ,a ,b ,c) `(if-zero ,(ren-ne-dom ξ a) ,(ren-dom ξ b) ,(ren-dom ξ c))]))
-
-(define (ren-dom ξ a)
-  (delay (match (force a)
-    ['zero 'zero]
-    [`(succ ,a) `(succ ,(ren-dom ξ a))]
-    [`(neu ,a) `(neu ,(ren-ne-dom ξ a))]
-    [`(fun ,f) `(fun ,(λ (ξ0 α) (f (compose-ren ξ0 ξ) α)))])))
-
 (define-syntax-rule (interp-fun a ρ)
-  (list 'fun (λ (ξ x) (interp a (ext (compose-ren-sub ξ ρ) x)))))
+  (list 'fun (λ (x) (interp a (ext ρ x)))))
 
 (define (interp a ρ)
   (delay (match a
@@ -62,28 +46,38 @@
     [`(λ ,a) (interp-fun a ρ)]
     [`(app ,a ,b) (ap (interp a ρ) (interp b ρ))])))
 
-(define (reify a)
+(define (reify n a)
   (match (force a)
     ['zero 'zero]
-    [`(succ ,a) `(succ ,(reify a))]
-    [`(fun ,f) (list 'λ (reify (f  (curry + 1) '(neu (var 0)))))]
-    [`(neu ,a) (reify-neu a)]))
+    [`(succ ,a) `(succ ,(reify n a))]
+    [`(fun ,f) (list 'λ (reify (+ n 1) (f `(neu (var ,n)))))]
+    [`(neu ,a) (reify-neu n a)]))
 
 (define (extract-body a)
   (match a
     [`(λ ,a) a]
     [_ (error "reify-neu: not reifiable")]))
 
-(define (reify-neu a)
+(define (reify-neu n a)
   (match a
-    [`(if-zero ,a ,b ,c) (list 'if (reify-neu a) (reify b) (extract-body (reify c)))]
-    [`(app ,u ,v) (list 'app (reify-neu u) (reify v))]
-    [`(var ,i) a]))
+    [`(if-zero ,a ,b ,c) (list 'if (reify-neu n a) (reify n b) (extract-body (reify n c)))]
+    [`(app ,u ,v) (list 'app (reify-neu n u) (reify n v))]
+    [`(var ,i) (list 'var (- n (+ i 1)))]))
 
-(define (idsub i) `(neu (var ,i)))
+(define (idsub s i) `(neu (var ,(- s (+ i 1)))))
+
+(define (scope a)
+  (match a
+    ['zero 0]
+    [`(succ ,a) (scope a)]
+    [`(if-zero ,a ,b ,c) (max (scope a) (scope b) (scope c))]
+    [`(λ ,a) (max 0 (- (scope a) 1))]
+    [`(app ,a ,b) (max (scope a) (scope b))]
+    [`(var ,i) (+ i 1)]))
 
 (define (normalize a)
-  (reify (interp a idsub)))
+  (let ([sa (scope a)])
+    (reify sa (interp a (curry idsub sa)))))
 
 (define (subst ρ a)
   (match a
