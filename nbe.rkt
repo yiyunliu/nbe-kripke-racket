@@ -3,19 +3,10 @@
 ;; t := λ t | app t t | i
 
 (define-type V Nonnegative-Integer)
+(define-type Term (∪ (List 'var V) (List 'λ Term) (List 'app Term Term)))
 
-(define-type Term (∪ Var Abs App))
-(struct Var ([get : V]))
-(struct Abs ([body : Term]))
-(struct App ([fun : Term] [arg : Term]))
-
-(define-type D (∪ D-ne Clos))
-(struct Idx ([get : V]))
-(struct D-ne ([get : (∪ Idx DApp)]))
-(struct Clos ([get : (-> (Promise D) (Promise D))] ))
-(struct DApp ([fun : D-ne] [arg : (Promise D)]))
-
-
+(define-type D (∪ (List 'fun (-> (Promise D) D)) (List 'neu D-ne)))
+(define-type D-ne (∪ (List 'app D-ne D) (List 'idx V)))
 
 (: ext (-> (-> V (Promise D)) (Promise D) (-> V (Promise D))))
 (define (ext ρ a)
@@ -24,53 +15,31 @@
         a
         (ρ (- i 1)))))
 
-(: ap (-> (Promise D) (Promise D) D))
-(define (ap a b)
-  (match (force a)
-    [(Clos f) (force (f b))]
-    [(D-ne u) (D-ne (DApp (D-ne u) b))]))
 
-;; (define-syntax-rule (ap a b)
-;;   (match (force a)
-;;     [`(fun ,f) (force (f b))]
-;;     [`(neu ,u) `(neu (app ,u ,b))]
-;;     [_ (error "ap: type error")]))
+(define-syntax-rule (ap a b)
+  (match a
+    [`(fun ,f) (f (delay b))]
+    [`(neu ,u) `(neu (app ,u ,b))]))
 
+
+(define-syntax-rule (interp-fun a ρ)
+  (list 'fun (λ (x) (interp a (ext ρ x)))))
+
+
+(: interp (-> Term (-> V (Promise D)) D))
+(define (interp a ρ)
+  (match a
+    [`(var ,i) (force (ρ i))]
+    ;; ['zero 'zero]
+    ;; [`(succ ,a) `(succ ,(interp a ρ))]
+    ;; [`(if-zero ,a ,b ,c) (ifz (interp a ρ) (interp b ρ) (interp-fun c ρ))]
+    [`(λ ,a) (interp-fun a ρ)]
+    [`(app ,a ,b) (ap (interp a ρ) (interp b ρ))]))
 
 ;; Domain
 ;; D := neu D_ne | fun [(var -> var) -> D → D]
 ;; D_ne := var i | app D_ne D
 
-;; (define (tm? a)
-;;   (match a
-;;     ['zero true]
-;;     [`(succ ,a) (tm? a)]
-;;     [`(if-zero ,a ,b ,c) (and (tm? a) (tm? b) (tm? c))]
-;;     [`(λ ,a) (tm? a)]
-;;     [`(app ,a ,b) (and (tm? a) (tm? b))]
-;;     [`(var ,i) (exact-nonnegative-integer? i)]
-;;     [_ false]))
-
-;; (define-syntax-rule (ap a b)
-;;   (match (force a)
-;;     [`(fun ,f) (force (f b))]
-;;     [`(neu ,u) `(neu (app ,u ,b))]
-;;     [_ (error "ap: type error")]))
-
-;; (define-syntax-rule (ifz a b c)
-;;   (match (force a)
-;;     ['zero (force b)]
-;;     [`(succ ,u) (ap c u)]
-;;     [`(neu ,u) `(neu (if-zero ,u ,b ,c))]))
-
-;; (define-syntax-rule (ext ρ a)
-;;   (lambda (i)
-;;     (if (zero? i)
-;;         a
-;;         (ρ (- i 1)))))
-
-;; (define-syntax-rule (interp-fun a ρ)
-;;   (list 'fun (λ (x) (interp a (ext ρ x)))))
 
 ;; (: interp (-> Term (-> Term)))
 
@@ -83,38 +52,44 @@
 ;;     [`(λ ,a) (interp-fun a ρ)]
 ;;     [`(app ,a ,b) (ap (interp a ρ) (interp b ρ))])))
 
-;; (define (reify n a)
-;;   (match (force a)
-;;     ['zero 'zero]
-;;     [`(succ ,a) `(succ ,(reify n a))]
-;;     [`(fun ,f) (list 'λ (reify (+ n 1) (f `(neu (var ,n)))))]
-;;     [`(neu ,a) (reify-neu n a)]))
+(: reify (-> V D Term))
+(define (reify n a)
+  (match a
+    ;; ['zero 'zero]
+    ;; [`(succ ,a) `(succ ,(reify n a))]
+    [`(fun ,f) (list 'λ (reify (+ n 1) (f (delay `(neu (idx ,n))))))]
+    [`(neu ,a) (reify-neu n a)]
+    ))
 
 ;; (define (extract-body a)
 ;;   (match a
 ;;     [`(λ ,a) a]
 ;;     [_ (error "reify-neu: not reifiable")]))
 
-;; (define (reify-neu n a)
-;;   (match a
-;;     [`(if-zero ,a ,b ,c) (list 'if (reify-neu n a) (reify n b) (extract-body (reify n c)))]
-;;     [`(app ,u ,v) (list 'app (reify-neu n u) (reify n v))]
-;;     [`(var ,i) (list 'var (- n (+ i 1)))]))
+(: reify-neu (-> V D-ne Term))
+(define (reify-neu n a)
+  (match a
+    ;; [`(if-zero ,a ,b ,c) (list 'if (reify-neu n a) (reify n b) (extract-body (reify n c)))]
+    [`(app ,u ,v) (list 'app (reify-neu n u) (reify n v))]
+    [`(idx ,i) (list 'var (max 0 (- n (+ i 1))))]))
 
-;; (define (idsub s i) `(neu (var ,(- s (+ i 1)))))
+(: idsub (-> V V D))
+(define (idsub s i) `(neu (idx ,(max 0 (- s (+ i 1))))))
 
-;; (define (scope a)
-;;   (match a
-;;     ['zero 0]
-;;     [`(succ ,a) (scope a)]
-;;     [`(if-zero ,a ,b ,c) (max (scope a) (scope b) (scope c))]
-;;     [`(λ ,a) (max 0 (- (scope a) 1))]
-;;     [`(app ,a ,b) (max (scope a) (scope b))]
-;;     [`(var ,i) (+ i 1)]))
+(: scope (-> Term V))
+(define (scope a)
+  (match a
+    ['zero 0]
+    [`(succ ,a) (scope a)]
+    [`(if-zero ,a ,b ,c) (max (scope a) (scope b) (scope c))]
+    [`(λ ,a) (max 0 (- (scope a) 1))]
+    [`(app ,a ,b) (max (scope a) (scope b))]
+    [`(var ,i) (+ i 1)]))
 
-;; (define (normalize a)
-;;   (let ([sa (scope a)])
-;;     (reify sa (interp a (curry idsub sa)))))
+(: normalize (-> Term Term))
+(define (normalize a)
+  (let ([sa (scope a)])
+    (reify sa (interp a (λ (x) (delay (idsub sa x)))))))
 
 ;; (define (subst ρ a)
 ;;   (match a
@@ -146,6 +121,7 @@
 ;;        [v `(app ,v ,(eval-tm-strict b))])]))
 
 ;; ;; Coquand's algorithm but for β-normal forms
+;; (: η-eq? (-> Term Term Boolean))
 ;; (define (η-eq? a b)
 ;;   (match (list a b)
 ;;     ['(zero zero) true]
@@ -163,7 +139,8 @@
 ;; (define (βη-eq? a b)
 ;;   (η-eq? (normalize a) (normalize b)))
 
-;; (define (β-eq? a b)
-;;   (equal? (normalize a) (normalize b)))
+(: β-eq? (-> Term Term Boolean))
+(define (β-eq? a b)
+  (equal? (normalize a) (normalize b)))
 
-;; (provide eval-tm eval-tm-strict reify interp normalize tm? η-eq? βη-eq? β-eq?)
+(provide reify interp normalize β-eq? Term D V)
