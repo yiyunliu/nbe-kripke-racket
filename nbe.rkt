@@ -3,9 +3,11 @@
 ;; t := λ t | app t t | i
 
 (define-type V Nonnegative-Integer)
-(define-type Term (∪ (List 'var V) (List 'λ Term) (List 'app Term Term)))
+(define-type Term (∪ 'zero (List 'succ Term) (List 'var V) (List 'λ Term) (List 'app Term Term)))
 
-(define-type D (∪ (List 'fun (-> (Promise D) D)) (List 'neu D-ne)))
+
+
+(define-type D (∪ 'zero (List 'succ (Promise D)) (List 'fun (-> (Promise D) D)) (List 'neu D-ne)))
 (define-type D-ne (∪ (List 'app D-ne D) (List 'idx V)))
 
 (: ext (-> (-> V (Promise D)) (Promise D) (-> V (Promise D))))
@@ -30,8 +32,8 @@
 (define (interp a ρ)
   (match a
     [`(var ,i) (force (ρ i))]
-    ;; ['zero 'zero]
-    ;; [`(succ ,a) `(succ ,(interp a ρ))]
+    ['zero 'zero]
+    [`(succ ,a) `(succ ,(delay (interp a ρ)))]
     ;; [`(if-zero ,a ,b ,c) (ifz (interp a ρ) (interp b ρ) (interp-fun c ρ))]
     [`(λ ,a) (interp-fun a ρ)]
     [`(app ,a ,b) (ap (interp a ρ) (interp b ρ))]))
@@ -55,11 +57,10 @@
 (: reify (-> V D Term))
 (define (reify n a)
   (match a
-    ;; ['zero 'zero]
-    ;; [`(succ ,a) `(succ ,(reify n a))]
+    ['zero 'zero]
+    [`(succ ,a) `(succ ,(reify n (force a)))]
     [`(fun ,f) (list 'λ (reify (+ n 1) (f (delay `(neu (idx ,n))))))]
-    [`(neu ,a) (reify-neu n a)]
-    ))
+    [`(neu ,a) (reify-neu n a)]))
 
 ;; (define (extract-body a)
 ;;   (match a

@@ -23,9 +23,10 @@
 (: tm-pair Term)
 (define tm-pair `(λ (λ (λ ,(tm-app '(var 0) '(var 2) '(var 1))))))
 
-;; (define tm-fix
-;;   (let ([g (tm-abs (tm-app (tm-var 1) (tm-app (tm-var 0) (tm-var 0))))])
-;;     (tm-abs (tm-app g g))))
+(: tm-fix Term)
+(define tm-fix
+  (let ([g (tm-abs (tm-app (tm-var 1) (tm-app (tm-var 0) (tm-var 0))))])
+    (tm-abs (tm-app g g))))
 
 (: tm-zero Term)
 (define tm-zero tm-snd)
@@ -51,10 +52,23 @@
       (tm-suc (tm-nat (- n 1)))
       tm-zero))
 
-;; (define (tm-pnat n)
-;;   (if (positive? n)
-;;       `(succ ,(tm-pnat (- n 1)))
-;;       'zero))
+(: tm-const Term)
+(define tm-const tm-fst)
+
+(: tm-loop Term)
+(define tm-loop
+  (let ([g (tm-abs (tm-app (tm-var 0) (tm-var 0)))])
+    (tm-app g g)))
+
+(: tm-nat-to-pnat Term)
+(define tm-nat-to-pnat
+  (tm-abs (tm-app (tm-var 0) (tm-abs '(succ (var 0))) 'zero)))
+
+(: tm-pnat (-> V Term))
+(define (tm-pnat n)
+  (if (positive? n)
+      `(succ ,(tm-pnat (- n 1)))
+      'zero))
 
 ;; (define (tm-ifz a b c)
 ;;   `(if-zero ,a ,b ,c))
@@ -75,6 +89,8 @@
 (check-equal? (normalize `(app (app (app ,tm-pair ,tm-id) ,tm-fst) ,tm-fst)) tm-id)
 (check-equal? (normalize (tm-app tm-snd (tm-app tm-pair tm-id tm-fst) tm-fst)) tm-fst)
 (check-equal? (normalize (tm-add (tm-nat 499) (tm-nat 777))) (normalize (tm-add (tm-nat 777) (tm-nat 499))))
+(check-equal? (normalize (tm-app tm-const (tm-nat 0) tm-loop)) (normalize (tm-nat 0)))
+(check-equal? (normalize (tm-app tm-nat-to-pnat (tm-nat 10))) (tm-pnat 10))
 ;; (check-equal? (normalize (tm-mult (tm-nat 3) (tm-nat 2))) (normalize (tm-nat 6)))
 ;; (check-equal? (normalize (tm-mult (tm-nat 11) (tm-nat 116))) (normalize (tm-nat 1276)))
 ;; (check η-eq? (normalize (tm-add (tm-nat 499) (tm-nat 777))) (normalize (tm-add (tm-nat 777) (tm-nat 499))))
