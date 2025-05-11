@@ -2,39 +2,56 @@
 ;; Grammar (Λ)
 ;; t := λ t | app t t | i
 
+(define-type denv (-> V (Promise D)))
 (define-type V Nonnegative-Integer)
-(define-type Term (∪ 'zero (List 'succ Term) (List 'var V) (List 'λ Term) (List 'app Term Term)))
+(define-type Term (∪ 'zero
+                     (List 'succ Term)
+                     (List 'var V)
+                     (List 'λ Term)
+                     (List 'app Term Term)
+                     (List 'ind Term Term Term)))
 
+(define-type D (∪ 'zero
+                  (List 'succ (Promise D))
+                  (List 'fun (-> (Promise D) D))
+                  (List 'fun2 (-> (Promise D) (Promise D) D))
+                  (List 'neu D-ne)
+                  ;; (List 'ind (-> (Promise D) (Promise D) D))
+                  ))
 
-
-(define-type D (∪ 'zero (List 'succ (Promise D)) (List 'fun (-> (Promise D) D)) (List 'neu D-ne)))
 (define-type D-ne (∪ (List 'app D-ne D) (List 'idx V)))
 
-(: ext (-> (-> V (Promise D)) (Promise D) (-> V (Promise D))))
+(: ext (-> denv (Promise D) denv))
 (define (ext ρ a)
     (lambda (i)
     (if (zero? i)
         a
         (ρ (- i 1)))))
 
-
 (define-syntax-rule (ap a b)
   (match a
     [`(fun ,f) (f (delay b))]
     [`(neu ,u) `(neu (app ,u ,b))]))
 
-
-(define-syntax-rule (interp-fun a ρ)
+(: interp-fun (-> Term denv D))
+(define (interp-fun a ρ)
   (list 'fun (λ (x) (interp a (ext ρ x)))))
 
+(: interp-ind (-> D (Promise D) (Promise D) denv D))
+(define (interp-ind a b c ρ)
+  (match a
+    [_ (error "unimplemented")]))
 
-(: interp (-> Term (-> V (Promise D)) D))
+(: interp (-> Term denv D))
 (define (interp a ρ)
   (match a
     [`(var ,i) (force (ρ i))]
     ['zero 'zero]
     [`(succ ,a) `(succ ,(delay (interp a ρ)))]
-    ;; [`(if-zero ,a ,b ,c) (ifz (interp a ρ) (interp b ρ) (interp-fun c ρ))]
+    [`(ind ,a ,b ,c) (interp-ind
+                      (interp a ρ)
+                      (delay (interp b ρ))
+                      (delay (interp c ρ)) ρ)]
     [`(λ ,a) (interp-fun a ρ)]
     [`(app ,a ,b) (ap (interp a ρ) (interp b ρ))]))
 
@@ -82,6 +99,7 @@
   (match a
     ['zero 0]
     [`(succ ,a) (scope a)]
+    (`(ind ,a ,b ,c) (max (scope a) (scope b) (scope c)))
     [`(if-zero ,a ,b ,c) (max (scope a) (scope b) (scope c))]
     [`(λ ,a) (max 0 (- (scope a) 1))]
     [`(app ,a ,b) (max (scope a) (scope b))]
