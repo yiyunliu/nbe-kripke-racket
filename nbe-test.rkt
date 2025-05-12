@@ -97,4 +97,5 @@
               (tm-pnat 12000))
 (check βη-eq? (tm-padd (tm-pnat 10000) (tm-pnat 2000)) (tm-pnat 12000))
 (check βη-eq? (tm-abs (tm-app (tm-var 1) (tm-var 0))) (tm-app tm-id (tm-var 0)))
+(check βη-eq? `(Π (U 0) (Π (var 0) ,(tm-app tm-id '(var 1)))) '(Π (U 0) (Π (var 0) (var 1))))
 (check-false (βη-eq? '(U 0) '(var 0)))

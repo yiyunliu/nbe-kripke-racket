@@ -5,14 +5,17 @@
 (define-type denv (-> V (Promise D)))
 (define-type V Nonnegative-Integer)
 (define-type Term (∪ 'zero
+                     'nat
                      (List 'succ Term)
                      (List 'var V)
                      (List 'λ Term)
                      (List 'app Term Term)
                      (List 'ind Term Term Term)
+                     (List 'Π Term Term)
                      (List 'U V)))
 
 (define-type D (∪ 'zero
+                  (List 'Π (Promise D) (-> (Promise D) D))
                   (List 'succ (Promise D))
                   (List 'fun (-> (Promise D) D))
                   (List 'neu D-ne)
@@ -29,9 +32,9 @@
         a
         (ρ (- i 1)))))
 
-(: interp-fun (-> Term denv D))
+(: interp-fun (-> Term denv (-> (Promise D) D)))
 (define (interp-fun a ρ)
-  (list 'fun (λ (x) (interp a (ext ρ x)))))
+  (λ (x) (interp a (ext ρ x))))
 
 (: interp-fun2 (-> Term denv (-> (Promise D) (Promise D) D)))
 (define (interp-fun2 a ρ)
@@ -56,6 +59,7 @@
 (define (interp a ρ)
   (match a
     [`(U ,_) a]
+    [`(Π ,A ,B) `(Π ,(delay (interp A ρ)) ,(interp-fun B ρ))]
     [`(var ,i) (force (ρ i))]
     ['zero 'zero]
     [`(succ ,a) `(succ ,(delay (interp a ρ)))]
@@ -63,17 +67,25 @@
                       (interp a ρ)
                       (delay (interp b ρ))
                       (interp-fun2 c ρ))]
-    [`(λ ,a) (interp-fun a ρ)]
+    [`(λ ,a) (list 'fun (interp-fun a ρ))]
     [`(app ,a ,b) (ap a b ρ)]))
 
 (: reify (-> V D Term))
 (define (reify n a)
   (match a
+    [`(Π ,A ,B) `(Π ,(reify n (force A)) ,(reify (+ n 1) (B (delay `(neu (idx ,n))))))]
     ['zero 'zero]
     [`(succ ,a) `(succ ,(reify n (force a)))]
     [`(U ,_) a]
     [`(fun ,f) (list 'λ (reify (+ n 1) (f (delay `(neu (idx ,n))))))]
     [`(neu ,a) (reify-neu n a)]))
+
+(: var-to-idx (-> V V V))
+(define (var-to-idx s v)
+  (let ([ret (- s (+ v 1))])
+    (if (< ret 0)
+        (error "variable to index conversion failed")
+        ret)))
 
 (: reify-neu (-> V D-ne Term))
 (define (reify-neu n a)
@@ -85,14 +97,15 @@
                                   (c (delay `(neu (idx ,n)))
                                      (delay `(neu (idx ,(+ 1 n)))))))]
     [`(app ,u ,v) (list 'app (reify-neu n u) (reify n v))]
-    [`(idx ,i) (list 'var (max 0 (- n (+ i 1))))]))
+    [`(idx ,i) (list 'var (var-to-idx n i))]))
 
 (: idsub (-> V V D))
-(define (idsub s i) `(neu (idx ,(max 0 (- s (+ i 1))))))
+(define (idsub s i) `(neu (idx ,(var-to-idx s i))))
 
 (: scope (-> Term V))
 (define (scope a)
   (match a
+    [`(Π ,A ,B) (max (scope A) (- (scope B) 2))]
     [`(U ,_) 0]
     ['zero 0]
     [`(succ ,a) (scope a)]
@@ -115,6 +128,7 @@
 (define (subst ρ a)
   (match a
     [`(U ,_) a]
+    [`(Π ,A ,B) `(Π ,(subst ρ A) ,(subst (up 1 ρ) B))]
     [`(var ,i) (ρ i)]
     [`(app ,a ,b) `(app ,(subst ρ a) ,(subst ρ b))]
     [`(λ ,a) `(λ ,(subst (up 1 ρ) a))]
@@ -133,6 +147,8 @@
 (define (η-eq? a b)
   (match (list a b)
     [`((U ,i) (U ,j)) (eqv? i j) ]
+    [`((Π ,A0 ,B0) (Π ,A1 ,B1))
+     (and (η-eq? A0 A1) (η-eq? B0 B1))]
     ['(zero zero) true]
     [`((succ ,a) (succ ,b)) (η-eq? a b)]
     [`((ind ,a ,b ,c) (ind ,a0 ,b0 ,c0))
