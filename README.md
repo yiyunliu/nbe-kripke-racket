@@ -1,4 +1,4 @@
-# untyped NbE in racket
+# Untyped NbE in Typed Racket
 [![status-badge](https://woodpecker.electriclam.com/api/badges/4/status.svg)](https://woodpecker.electriclam.com/repos/4)
 
 An implementation of normalization by evaluation loosely based on [A
