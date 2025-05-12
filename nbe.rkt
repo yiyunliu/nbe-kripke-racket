@@ -20,14 +20,12 @@
                      (List 'idx V)
                      (List 'ind D-ne D (-> (Promise D) (Promise D) D))))
 
-(: ext (-> denv (Promise D) denv))
+(: ext (All (A) (-> (-> V A) A (-> V A))))
 (define (ext ρ a)
     (lambda (i)
     (if (zero? i)
         a
         (ρ (- i 1)))))
-
-
 
 (: interp-fun (-> Term denv D))
 (define (interp-fun a ρ)
@@ -104,56 +102,47 @@
   (let ([sa (scope a)])
     (reify sa (interp a (λ (x) (delay (idsub sa x)))))))
 
-;; (define (subst ρ a)
-;;   (match a
-;;     [`(var ,i) (ρ i)]
-;;     [`(app ,a ,b) `(app ,(subst ρ a) ,(subst ρ b))]
-;;     [`(λ ,a) `(λ ,(subst (ext (compose (curry subst (λ (i) `(var ,(+ i 1)))) ρ)
-;;                               '(var 0)) a))]))
+(: up (-> V (-> V Term) (-> V Term)))
+(define (up n ρ)
+  (ext (λ ([x : V]) (subst (λ (i) `(var ,(+ i n))) (ρ x))) '(var 0)))
 
-;; (define (idsub-tm i) `(var ,i))
-;; (define (subst1 b a)
-;;   (subst (ext idsub-tm b) a))
+(: subst (-> (-> V Term) Term Term))
+(define (subst ρ a)
+  (match a
+    [`(var ,i) (ρ i)]
+    [`(app ,a ,b) `(app ,(subst ρ a) ,(subst ρ b))]
+    [`(λ ,a) `(λ ,(subst (up 1 ρ) a))]
+    ['zero 'zero]
+    [`(succ ,a) `(succ ,(subst ρ a))]
+    [`(ind ,a ,b ,c) `(ind ,(subst ρ a) ,(subst ρ b) ,(subst (up 2 ρ) c))]))
 
-;; (define (eval-tm a)
-;;   (match a
-;;     [(list 'var _) a]
-;;     [(list 'λ a) `(λ ,(eval-tm a))]
-;;     [(list 'app a b)
-;;      (match (eval-tm a)
-;;        [(list 'λ a) (eval-tm (subst1 b a))]
-;;        [v `(app ,v ,(eval-tm b))])]))
+(: idsub-tm (-> V Term))
+(define (idsub-tm i) `(var ,i))
+(: subst1 (-> Term Term Term))
+(define (subst1 b a)
+  (subst (ext idsub-tm b) a))
 
-;; (define (eval-tm-strict a)
-;;   (match a
-;;     [(list 'var _) a]
-;;     [(list 'λ a) `(λ ,(eval-tm-strict a))]
-;;     [(list 'app a b)
-;;      (match (eval-tm-strict a)
-;;        [(list 'λ a) (eval-tm-strict (subst1 (eval-tm-strict b) a))]
-;;        [v `(app ,v ,(eval-tm-strict b))])]))
+;; Coquand's algorithm but for β-normal forms
+(: η-eq? (-> Term Term Boolean))
+(define (η-eq? a b)
+  (match (list a b)
+    ['(zero zero) true]
+    [`((succ ,a) (succ ,b)) (η-eq? a b)]
+    [`((ind ,a ,b ,c) (ind ,a0 ,b0 ,c0))
+     (and (η-eq? a a0) (η-eq? b b0) (η-eq? c c0))]
+    [`((λ ,a) (λ ,b)) (η-eq? a b)]
+    [`((λ ,a) ,u) (η-eq? a `(app ,(subst (λ (i) `(var ,(+ i 1))) u) (var 0)))]
+    [`(,u (λ ,a)) (η-eq? `(app ,(subst (λ (i) `(var ,(+ i 1))) u) (var 0)) a)]
+    [`((app ,u0 ,v0) (app ,u1 ,v1)) (and (η-eq? u0 u1) (η-eq? v0 v1))]
+    [`((var ,i) (var ,j)) (eqv? i j)]
+    [_ false]))
 
-;; ;; Coquand's algorithm but for β-normal forms
-;; (: η-eq? (-> Term Term Boolean))
-;; (define (η-eq? a b)
-;;   (match (list a b)
-;;     ['(zero zero) true]
-;;     [`((succ ,a) (succ ,b)) (η-eq? a b)]
-;;     [`((if-zero ,a ,b ,c) (if-zero ,a0 ,b0 ,c0))
-;;      (and (η-eq? a a0) (η-eq? b b0) (η-eq? c c0))]
-;;     [`((λ ,a) (λ ,b)) (η-eq? a b)]
-;;     [`((λ ,a) ,u) (η-eq? a `(app ,(subst (λ (i) `(var ,(+ i 1))) u) (var 0)))]
-;;     [`(,u (λ ,a)) (η-eq? `(app ,(subst (λ (i) `(var ,(+ i 1))) u) (var 0)) a)]
-;;     [`((app ,u0 ,v0) (app ,u1 ,v1)) (and (η-eq? u0 u1) (η-eq? v0 v1))]
-;;     [`((var ,i) (var ,j)) (eqv? i j)]
-;;     [_ false]))
-
-
-;; (define (βη-eq? a b)
-;;   (η-eq? (normalize a) (normalize b)))
+(: βη-eq? (-> Term Term Boolean))
+(define (βη-eq? a b)
+  (η-eq? (normalize a) (normalize b)))
 
 (: β-eq? (-> Term Term Boolean))
 (define (β-eq? a b)
   (equal? (normalize a) (normalize b)))
 
-(provide reify interp normalize β-eq? Term D V)
+(provide reify interp normalize β-eq? Term D V βη-eq?)

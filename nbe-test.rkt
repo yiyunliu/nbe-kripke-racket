@@ -91,5 +91,8 @@
 (check-equal? (normalize (tm-app tm-nat-to-pnat (tm-nat 10))) (tm-pnat 10))
 (check-equal? (normalize `(ind ,(tm-pnat 3) ,(tm-pnat 0) (var 1))) (tm-pnat 2))
 (check-equal? (normalize `(ind ,(tm-pnat 3) ,tm-loop (var 1))) (tm-pnat 2))
+(check-equal? (normalize (tm-padd (tm-pnat 1) '(succ (var 0)))) '(succ (succ (var 0))))
 (check-equal? (normalize (tm-padd (tm-pnat 10000) (tm-pnat 2000)))
               (tm-pnat 12000))
+(check βη-eq? (tm-padd (tm-pnat 10000) (tm-pnat 2000)) (tm-pnat 12000))
+(check βη-eq? (tm-abs (tm-app (tm-var 1) (tm-var 0))) (tm-app tm-id (tm-var 0)))
