@@ -168,4 +168,4 @@
 (define (β-eq? a b)
   (equal? (normalize a) (normalize b)))
 
-(provide reify interp normalize β-eq? Term D V βη-eq?)
+(provide reify interp normalize β-eq? Term D D-ne V βη-eq? ext subst1 subst idsub-tm)
