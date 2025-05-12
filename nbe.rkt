@@ -9,12 +9,14 @@
                      (List 'var V)
                      (List 'λ Term)
                      (List 'app Term Term)
-                     (List 'ind Term Term Term)))
+                     (List 'ind Term Term Term)
+                     (List 'U V)))
 
 (define-type D (∪ 'zero
                   (List 'succ (Promise D))
                   (List 'fun (-> (Promise D) D))
-                  (List 'neu D-ne)))
+                  (List 'neu D-ne)
+                  (List 'U V)))
 
 (define-type D-ne (∪ (List 'app D-ne D)
                      (List 'idx V)
@@ -40,19 +42,20 @@
   (match a
     [`(neu ,u) `(neu (ind ,u ,(force b) ,c))]
     ['zero (force b)]
-    [`(succ ,a) (c a (delay (interp-ind (force a) b c)))]))
+    [`(succ ,a) (c a (delay (interp-ind (force a) b c)))]
+    [_ (error "type-error: ind")]))
 
-(: ap (-> D Term denv D))
+(: ap (-> Term Term denv D))
 (define (ap a b ρ)
-  (match a
-    ['zero (error "type-error: ap zero")]
-    [`(succ ,_) (error "type-error: ap succ")]
+  (match (interp a ρ)
     [`(fun ,f) (f (delay (interp b ρ)))]
-    [`(neu ,u) `(neu (app ,u ,(interp b ρ)))]))
+    [`(neu ,u) `(neu (app ,u ,(interp b ρ)))]
+    [_ (error "type-error: ap")]))
 
 (: interp (-> Term denv D))
 (define (interp a ρ)
   (match a
+    [`(U ,_) a]
     [`(var ,i) (force (ρ i))]
     ['zero 'zero]
     [`(succ ,a) `(succ ,(delay (interp a ρ)))]
@@ -61,13 +64,14 @@
                       (delay (interp b ρ))
                       (interp-fun2 c ρ))]
     [`(λ ,a) (interp-fun a ρ)]
-    [`(app ,a ,b) (ap (interp a ρ) b ρ)]))
+    [`(app ,a ,b) (ap a b ρ)]))
 
 (: reify (-> V D Term))
 (define (reify n a)
   (match a
     ['zero 'zero]
     [`(succ ,a) `(succ ,(reify n (force a)))]
+    [`(U ,_) a]
     [`(fun ,f) (list 'λ (reify (+ n 1) (f (delay `(neu (idx ,n))))))]
     [`(neu ,a) (reify-neu n a)]))
 
@@ -89,6 +93,7 @@
 (: scope (-> Term V))
 (define (scope a)
   (match a
+    [`(U ,_) 0]
     ['zero 0]
     [`(succ ,a) (scope a)]
     (`(ind ,a ,b ,c) (max (scope a) (scope b) (- (scope c) 2)))
@@ -109,6 +114,7 @@
 (: subst (-> (-> V Term) Term Term))
 (define (subst ρ a)
   (match a
+    [`(U ,_) a]
     [`(var ,i) (ρ i)]
     [`(app ,a ,b) `(app ,(subst ρ a) ,(subst ρ b))]
     [`(λ ,a) `(λ ,(subst (up 1 ρ) a))]
@@ -126,6 +132,7 @@
 (: η-eq? (-> Term Term Boolean))
 (define (η-eq? a b)
   (match (list a b)
+    [`((U ,i) (U ,j)) (eqv? i j) ]
     ['(zero zero) true]
     [`((succ ,a) (succ ,b)) (η-eq? a b)]
     [`((ind ,a ,b ,c) (ind ,a0 ,b0 ,c0))

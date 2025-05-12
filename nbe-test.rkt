@@ -83,6 +83,7 @@
   `(succ ,a))
 
 (check-equal? (normalize `(app ,tm-id ,tm-id)) tm-id)
+(check βη-eq? `(app ,tm-id (U 0)) '(U 0))
 (check-equal? (normalize `(app (app (app ,tm-pair ,tm-id) ,tm-fst) ,tm-snd)) tm-fst)
 (check-equal? (normalize `(app (app (app ,tm-pair ,tm-id) ,tm-fst) ,tm-fst)) tm-id)
 (check-equal? (normalize (tm-app tm-snd (tm-app tm-pair tm-id tm-fst) tm-fst)) tm-fst)
@@ -96,3 +97,4 @@
               (tm-pnat 12000))
 (check βη-eq? (tm-padd (tm-pnat 10000) (tm-pnat 2000)) (tm-pnat 12000))
 (check βη-eq? (tm-abs (tm-app (tm-var 1) (tm-var 0))) (tm-app tm-id (tm-var 0)))
+(check-false (βη-eq? '(U 0) '(var 0)))
