@@ -14,12 +14,11 @@
 (define-type D (∪ 'zero
                   (List 'succ (Promise D))
                   (List 'fun (-> (Promise D) D))
-                  (List 'fun2 (-> (Promise D) (Promise D) D))
-                  (List 'neu D-ne)
-                  ;; (List 'ind (-> (Promise D) (Promise D) D))
-                  ))
+                  (List 'neu D-ne)))
 
-(define-type D-ne (∪ (List 'app D-ne D) (List 'idx V)))
+(define-type D-ne (∪ (List 'app D-ne D)
+                     (List 'idx V)
+                     (List 'ind D-ne D (-> (Promise D) (Promise D) D))))
 
 (: ext (-> denv (Promise D) denv))
 (define (ext ρ a)
@@ -28,19 +27,30 @@
         a
         (ρ (- i 1)))))
 
-(define-syntax-rule (ap a b)
-  (match a
-    [`(fun ,f) (f (delay b))]
-    [`(neu ,u) `(neu (app ,u ,b))]))
+
 
 (: interp-fun (-> Term denv D))
 (define (interp-fun a ρ)
   (list 'fun (λ (x) (interp a (ext ρ x)))))
 
-(: interp-ind (-> D (Promise D) (Promise D) denv D))
-(define (interp-ind a b c ρ)
+(: interp-fun2 (-> Term denv (-> (Promise D) (Promise D) D)))
+(define (interp-fun2 a ρ)
+  (λ (x y) (interp a (ext (ext ρ x) y))))
+
+(: interp-ind (-> D (Promise D) (-> (Promise D) (Promise D) D) D))
+(define (interp-ind a b c)
   (match a
-    [_ (error "unimplemented")]))
+    [`(neu ,u) `(neu (ind ,u ,(force b) ,c))]
+    ['zero (force b)]
+    [`(succ ,a) (c a (delay (interp-ind (force a) b c)))]))
+
+(: ap (-> D Term denv D))
+(define (ap a b ρ)
+  (match a
+    ['zero (error "type-error: ap zero")]
+    [`(succ ,_) (error "type-error: ap succ")]
+    [`(fun ,f) (f (delay (interp b ρ)))]
+    [`(neu ,u) `(neu (app ,u ,(interp b ρ)))]))
 
 (: interp (-> Term denv D))
 (define (interp a ρ)
@@ -51,25 +61,9 @@
     [`(ind ,a ,b ,c) (interp-ind
                       (interp a ρ)
                       (delay (interp b ρ))
-                      (delay (interp c ρ)) ρ)]
+                      (interp-fun2 c ρ))]
     [`(λ ,a) (interp-fun a ρ)]
-    [`(app ,a ,b) (ap (interp a ρ) (interp b ρ))]))
-
-;; Domain
-;; D := neu D_ne | fun [(var -> var) -> D → D]
-;; D_ne := var i | app D_ne D
-
-
-;; (: interp (-> Term (-> Term)))
-
-;; (define (interp a ρ)
-;;   (delay (match a
-;;     [`(var ,i) (force (ρ i))]
-;;     ['zero 'zero]
-;;     [`(succ ,a) `(succ ,(interp a ρ))]
-;;     [`(if-zero ,a ,b ,c) (ifz (interp a ρ) (interp b ρ) (interp-fun c ρ))]
-;;     [`(λ ,a) (interp-fun a ρ)]
-;;     [`(app ,a ,b) (ap (interp a ρ) (interp b ρ))])))
+    [`(app ,a ,b) (ap (interp a ρ) b ρ)]))
 
 (: reify (-> V D Term))
 (define (reify n a)
@@ -79,15 +73,15 @@
     [`(fun ,f) (list 'λ (reify (+ n 1) (f (delay `(neu (idx ,n))))))]
     [`(neu ,a) (reify-neu n a)]))
 
-;; (define (extract-body a)
-;;   (match a
-;;     [`(λ ,a) a]
-;;     [_ (error "reify-neu: not reifiable")]))
-
 (: reify-neu (-> V D-ne Term))
 (define (reify-neu n a)
   (match a
-    ;; [`(if-zero ,a ,b ,c) (list 'if (reify-neu n a) (reify n b) (extract-body (reify n c)))]
+    [`(ind ,a ,b ,c) (list 'ind
+                           (reify-neu n a)
+                           (reify n b)
+                           (reify (+ n 2)
+                                  (c (delay `(neu (idx ,n)))
+                                     (delay `(neu (idx ,(+ 1 n)))))))]
     [`(app ,u ,v) (list 'app (reify-neu n u) (reify n v))]
     [`(idx ,i) (list 'var (max 0 (- n (+ i 1))))]))
 
@@ -99,7 +93,7 @@
   (match a
     ['zero 0]
     [`(succ ,a) (scope a)]
-    (`(ind ,a ,b ,c) (max (scope a) (scope b) (scope c)))
+    (`(ind ,a ,b ,c) (max (scope a) (scope b) (- (scope c) 2)))
     [`(if-zero ,a ,b ,c) (max (scope a) (scope b) (scope c))]
     [`(λ ,a) (max 0 (- (scope a) 1))]
     [`(app ,a ,b) (max (scope a) (scope b))]

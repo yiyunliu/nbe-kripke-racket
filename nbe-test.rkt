@@ -39,6 +39,14 @@
   (tm-abs (tm-abs
            (tm-app b (tm-var 1) (tm-app a (tm-var 1) (tm-var 0))))))
 
+(: tm-ind (-> Term Term Term Term))
+(define (tm-ind a b c)
+  `(ind ,a ,b ,c))
+
+(: tm-padd (-> Term Term Term))
+(define (tm-padd a b)
+  (tm-app (tm-ind a tm-id (tm-abs (tm-psuc (tm-app (tm-var 1) (tm-var 0))))) b))
+
 (: tm-compose (-> Term Term Term))
 (define (tm-compose a b)
   (tm-abs (tm-app a (tm-app b (tm-var 0)))))
@@ -70,19 +78,9 @@
       `(succ ,(tm-pnat (- n 1)))
       'zero))
 
-;; (define (tm-ifz a b c)
-;;   `(if-zero ,a ,b ,c))
-
-;; (define (tm-psuc a)
-;;   `(succ ,a))
-
-;; (define (tm-double m)
-;;   (tm-app tm-fix
-;;           (tm-abs (tm-abs (tm-ifz (tm-var 0) 'zero 'zero))) m ))
-
-;; (define (tm-padd m n)
-;;   (tm-app tm-fix
-;;           (tm-abs (tm-abs (tm-abs (tm-ifz (tm-var 1) (tm-var 0) (tm-psuc (tm-app (tm-var 3) (tm-var 0) (tm-var 1))))))) m n))
+(: tm-psuc (-> Term Term))
+(define (tm-psuc a)
+  `(succ ,a))
 
 (check-equal? (normalize `(app ,tm-id ,tm-id)) tm-id)
 (check-equal? (normalize `(app (app (app ,tm-pair ,tm-id) ,tm-fst) ,tm-snd)) tm-fst)
@@ -91,10 +89,7 @@
 (check-equal? (normalize (tm-add (tm-nat 499) (tm-nat 777))) (normalize (tm-add (tm-nat 777) (tm-nat 499))))
 (check-equal? (normalize (tm-app tm-const (tm-nat 0) tm-loop)) (normalize (tm-nat 0)))
 (check-equal? (normalize (tm-app tm-nat-to-pnat (tm-nat 10))) (tm-pnat 10))
-;; (check-equal? (normalize (tm-mult (tm-nat 3) (tm-nat 2))) (normalize (tm-nat 6)))
-;; (check-equal? (normalize (tm-mult (tm-nat 11) (tm-nat 116))) (normalize (tm-nat 1276)))
-;; (check η-eq? (normalize (tm-add (tm-nat 499) (tm-nat 777))) (normalize (tm-add (tm-nat 777) (tm-nat 499))))
-;; (check βη-eq? (tm-mult (tm-nat 6) (tm-nat 7)) (tm-nat 42))
-;; (check βη-eq? '(if-zero (succ (succ zero)) zero (succ (succ (var 0)))) (tm-pnat 3))
-;; (check βη-eq? (tm-padd (tm-pnat 8) (tm-pnat 11)) (tm-pnat 19))
-;; (check βη-eq? (tm-padd (tm-pnat 2) (tm-psuc (tm-var 0))) '(succ (succ (succ (var 0)))))
+(check-equal? (normalize `(ind ,(tm-pnat 3) ,(tm-pnat 0) (var 1))) (tm-pnat 2))
+(check-equal? (normalize `(ind ,(tm-pnat 3) ,tm-loop (var 1))) (tm-pnat 2))
+(check-equal? (normalize (tm-padd (tm-pnat 10000) (tm-pnat 2000)))
+              (tm-pnat 12000))
