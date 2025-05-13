@@ -70,6 +70,38 @@
     [`(λ ,a) (list 'fun (interp-fun a ρ))]
     [`(app ,a ,b) (ap a b ρ)]))
 
+(: open-dom (-> V (-> (Promise D) D) D))
+(define (open-dom n f)
+  (f (delay `(neu (idx ,n)))))
+
+(: open-dom2 (-> V (-> (Promise D) (Promise D) D) D))
+(define (open-dom2 n f)
+  (f (delay `(neu (idx ,n))) (delay `(neu (idx ,(add1 n))))))
+
+(: compare (-> V D D Boolean))
+(define (compare n a0 a1)
+  (match (list a0 a1)
+    [`((Π ,A0 ,B0) (Π ,A1 ,B1))
+     (and (compare n (force A0) (force A1))
+          (compare (add1 n) (open-dom n B0) (open-dom n B1)))]
+    ['(nat nat) #t]
+    [`((U ,i) (U ,j)) (eqv? i j)]
+    ['(zero zero) #t]
+    [`((succ ,a) (succ ,b)) (compare n (force a) (force b))]
+    [`((fun ,f) (neu ,u)) (compare (add1 n) (open-dom n f) `(neu (app ,u (neu (idx ,n)))))]
+    [`((neu ,_) (fun ,_)) (compare n a1 a0)]
+    [`((neu ,a) (neu ,b)) (compare-neu n a b)]
+    [(list _ _) #f]))
+
+(: compare-neu (-> V D-ne D-ne Boolean))
+(define (compare-neu n a0 a1)
+  (match (list a0 a1)
+    [`((idx ,i) (idx ,j)) (eqv? i j)]
+    [`((app ,u0 ,v0) (app ,u1 ,v1)) (and (compare-neu n u0 u1) (compare n v0 v1))]
+    [`((ind ,a0 ,b0 ,c0) (ind ,a1 ,b1 ,c1)) (and (compare-neu n a0 a1)
+                                                 (compare n b0 b1)
+                                                 (compare (+ n 2) (open-dom2 n c0) (open-dom2 n c1)))]))
+
 (: reify (-> V D Term))
 (define (reify n a)
   (match a
@@ -143,6 +175,7 @@
   (subst (ext idsub-tm b) a))
 
 ;; Coquand's algorithm but for β-normal forms
+;; Subsumed by the compare function
 (: η-eq? (-> Term Term Boolean))
 (define (η-eq? a b)
   (match (list a b)
