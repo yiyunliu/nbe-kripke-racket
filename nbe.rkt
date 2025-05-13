@@ -10,14 +10,14 @@
                      (List 'app Term Term)
                      (List 'ind Term Term Term)
                      (List 'Π Term Term)
-                     (List 'U V)))
+                     'U))
 
 (define-type D (∪ 'zero
                   (List 'Π (Promise D) (-> (Promise D) D))
                   (List 'succ (Promise D))
                   (List 'fun (-> (Promise D) D))
                   (List 'neu D-ne)
-                  (List 'U V)))
+                  'U))
 
 (define-type D-ne (∪ (List 'app D-ne D)
                      (List 'idx V)
@@ -56,7 +56,7 @@
 (: interp (-> Term denv D))
 (define (interp a ρ)
   (match a
-    [`(U ,_) a]
+    ['U a]
     [`(Π ,A ,B) `(Π ,(delay (interp A ρ)) ,(interp-fun B ρ))]
     [`(var ,i) (force (ρ i))]
     ['zero 'zero]
@@ -83,7 +83,7 @@
      (and (compare n (force A0) (force A1))
           (compare (add1 n) (open-dom n B0) (open-dom n B1)))]
     ['(nat nat) #t]
-    [`((U ,i) (U ,j)) (eqv? i j)]
+    ['(U U) #t]
     ['(zero zero) #t]
     [`((succ ,a) (succ ,b)) (compare n (force a) (force b))]
     [`((fun ,f) (neu ,u)) (compare (add1 n) (open-dom n f) `(neu (app ,u (neu (idx ,n)))))]
@@ -107,7 +107,7 @@
     [`(Π ,A ,B) `(Π ,(reify n (force A)) ,(reify (+ n 1) (B (delay `(neu (idx ,n))))))]
     ['zero 'zero]
     [`(succ ,a) `(succ ,(reify n (force a)))]
-    [`(U ,_) a]
+    ['U a]
     [`(fun ,f) (list 'λ (reify (+ n 1) (f (delay `(neu (idx ,n))))))]
     [`(neu ,a) (reify-neu n a)]))
 
@@ -137,7 +137,7 @@
 (define (scope a)
   (match a
     [`(Π ,A ,B) (max (scope A) (- (scope B) 2))]
-    [`(U ,_) 0]
+    ['U 0]
     ['zero 0]
     [`(succ ,a) (scope a)]
     (`(ind ,a ,b ,c) (max (scope a) (scope b) (- (scope c) 2)))
@@ -162,7 +162,7 @@
 (: subst (-> (-> V Term) Term Term))
 (define (subst ρ a)
   (match a
-    [`(U ,_) a]
+    ['U a]
     [`(Π ,A ,B) `(Π ,(subst ρ A) ,(subst (up 1 ρ) B))]
     [`(var ,i) (ρ i)]
     [`(app ,a ,b) `(app ,(subst ρ a) ,(subst ρ b))]
@@ -182,7 +182,7 @@
 (: η-eq? (-> Term Term Boolean))
 (define (η-eq? a b)
   (match (list a b)
-    [`((U ,i) (U ,j)) (eqv? i j) ]
+    ['(U U) #t ]
     [`((Π ,A0 ,B0) (Π ,A1 ,B1))
      (and (η-eq? A0 A1) (η-eq? B0 B1))]
     ['(zero zero) true]
