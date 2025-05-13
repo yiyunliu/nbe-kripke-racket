@@ -91,7 +91,7 @@
     [`((fun ,f) (neu ,u)) (compare (add1 n) (open-dom n f) `(neu (app ,u (neu (idx ,n)))))]
     [`((neu ,_) (fun ,_)) (compare n a1 a0)]
     [`((neu ,a) (neu ,b)) (compare-neu n a b)]
-    [(list _ _) #f]))
+    [_ #f]))
 
 (: compare-neu (-> V D-ne D-ne Boolean))
 (define (compare-neu n a0 a1)
@@ -100,7 +100,8 @@
     [`((app ,u0 ,v0) (app ,u1 ,v1)) (and (compare-neu n u0 u1) (compare n v0 v1))]
     [`((ind ,a0 ,b0 ,c0) (ind ,a1 ,b1 ,c1)) (and (compare-neu n a0 a1)
                                                  (compare n b0 b1)
-                                                 (compare (+ n 2) (open-dom2 n c0) (open-dom2 n c1)))]))
+                                                 (compare (+ n 2) (open-dom2 n c0) (open-dom2 n c1)))]
+    [_ #f]))
 
 (: reify (-> V D Term))
 (define (reify n a)
@@ -195,7 +196,8 @@
 
 (: βη-eq? (-> Term Term Boolean))
 (define (βη-eq? a b)
-  (η-eq? (normalize a) (normalize b)))
+  (let ([n (max (scope a) (scope b))])
+    (compare n (interp a (λ (x) (delay (idsub n x)))) (interp b (λ (x) (delay (idsub n x)))))))
 
 (: β-eq? (-> Term Term Boolean))
 (define (β-eq? a b)
