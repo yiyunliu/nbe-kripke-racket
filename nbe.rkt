@@ -1,6 +1,4 @@
 #lang typed/racket
-;; Grammar (Λ)
-;; t := λ t | app t t | i
 
 (define-type denv (-> V (Promise D)))
 (define-type V Nonnegative-Integer)
