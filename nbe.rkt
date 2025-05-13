@@ -146,6 +146,10 @@
     [`(app ,a ,b) (max (scope a) (scope b))]
     [`(var ,i) (+ i 1)]))
 
+(: interp-with-scope (-> V Term D))
+(define (interp-with-scope n a)
+  (interp a (λ (x) (delay (idsub n x)))))
+
 (: normalize (-> Term Term))
 (define (normalize a)
   (let ([sa (scope a)])
