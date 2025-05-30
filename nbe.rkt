@@ -21,7 +21,7 @@
                      'zero
                      'nat
                      (List 'λ Norm)
-                     (List 'U V)
+                     'U
                      (List 'succ Norm)
                      (List 'Π Norm Norm)))
 
