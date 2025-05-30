@@ -23,7 +23,11 @@
 
 (: synth (-> context Term Term))
 (define (synth Γ a)
-  (error "unimplmented"))
+  (match a
+    [`(var ,i) (context-get Γ i)]
+    [`(app ,a ,b)
+     (let ([A (synth Γ a)]
+           [D (interp-with-scope (context-len Γ) A)]))]))
 
 (: check (-> context Term D Boolean))
 (define (check Γ a A)

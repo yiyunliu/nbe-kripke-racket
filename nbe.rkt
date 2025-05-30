@@ -2,6 +2,7 @@
 
 (define-type denv (-> V (Promise D)))
 (define-type V Nonnegative-Integer)
+
 (define-type Term (∪ 'zero
                      'nat
                      (List 'succ Term)
@@ -11,6 +12,24 @@
                      (List 'ind Term Term Term)
                      (List 'Π Term Term)
                      'U))
+
+(define-type Neu (∪ (List 'ind Neu Norm Norm)
+                    (List 'var V)
+                    (List 'app Neu Norm)))
+
+(define-type Norm (∪ Neu
+                     'zero
+                     'nat
+                     (List 'λ Norm)
+                     (List 'U V)
+                     (List 'succ Norm)
+                     (List 'Π Norm Norm)))
+
+(: embed (-> Neu Term))
+(define (embed a) a)
+
+(: embed-norm (-> Norm Term))
+(define (embed-norm a) a)
 
 (define-type D (∪ 'zero
                   (List 'Π (Promise D) (-> (Promise D) D))
@@ -101,7 +120,7 @@
                                                  (compare (+ n 2) (open-dom2 n c0) (open-dom2 n c1)))]
     [_ #f]))
 
-(: reify (-> V D Term))
+(: reify (-> V D Norm))
 (define (reify n a)
   (match a
     [`(Π ,A ,B) `(Π ,(reify n (force A)) ,(reify (+ n 1) (B (delay `(neu (idx ,n))))))]
@@ -118,7 +137,7 @@
         (error "variable to index conversion failed")
         ret)))
 
-(: reify-neu (-> V D-ne Term))
+(: reify-neu (-> V D-ne Neu))
 (define (reify-neu n a)
   (match a
     [`(ind ,a ,b ,c) (list 'ind
